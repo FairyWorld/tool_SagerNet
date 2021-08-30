@@ -39,6 +39,7 @@ import io.nekohasekai.sagernet.databinding.LayoutAssetsBinding
 import io.nekohasekai.sagernet.ktx.*
 import io.nekohasekai.sagernet.widget.UndoSnackbarManager
 import okhttp3.Request
+import org.tukaani.xz.XZInputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.util.*
@@ -291,11 +292,12 @@ class AssetsActivity : ThemedActivity() {
         var fileName = file.name
         if (DataStore.rulesProvider == 0) {
             if (file.name == internalFiles[0]) {
-                repo = "v2fly/geoip"
+                repo = "SagerNet/geoip"
             } else {
                 repo = "v2fly/domain-list-community"
                 fileName = "dlc.dat"
             }
+            fileName = "$fileName.xz"
         } else {
             repo = "Loyalsoldier/v2ray-rules-dat"
         }
@@ -331,8 +333,11 @@ class AssetsActivity : ThemedActivity() {
             error("Error when downloading $browserDownloadUrl : HTTP ${response.code}")
         }
 
+        var input = response.body!!.byteStream()
+        if (fileName.endsWith(".xz")) input = XZInputStream(input)
+
         file.outputStream().use { out ->
-            response.body!!.byteStream().use {
+            input.use {
                 it.copyTo(out)
             }
         }

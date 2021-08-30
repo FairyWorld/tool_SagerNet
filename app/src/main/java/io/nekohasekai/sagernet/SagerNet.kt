@@ -83,44 +83,69 @@ class SagerNet : Application(),
 
         Seq.setContext(this)
 
-        val externalAssets = getExternalFilesDir(null) ?: filesDir
-        Libcore.initializeV2Ray(externalAssets.absolutePath + "/", "v2ray/", true)
+        val internalAssets = filesDir
+        val externalAssets = getExternalFilesDir(null) ?: internalAssets
+        Libcore.initializeV2Ray(
+            internalAssets.absolutePath + "/", externalAssets.absolutePath + "/", "v2ray/", true
+        )
         Libcore.setenv("v2ray.conf.geoloader", "memconservative")
         Libcore.setUidDumper(UidDumper)
 
         runOnDefaultDispatcher {
+            internalAssets.mkdirs()
             externalAssets.mkdirs()
-            val geoip = File(externalAssets, "geoip.dat")
-            val geoipVersion = File(externalAssets, "geoip.version.txt")
-            val geoipVersionInternal = assets.open("v2ray/geoip.version.txt")
-                .use { it.bufferedReader().readText() }
-            if (!geoip.isFile || DataStore.rulesProvider == 0 && geoipVersion.isFile && geoipVersionInternal.toLong() > geoipVersion.readText()
-                    .toLongOrNull() ?: -1L
-            ) {
-                XZInputStream(assets.open("v2ray/geoip.dat.xz")).use { input ->
-                    geoip.outputStream().use {
-                        input.copyTo(it)
-                    }
-                }
-                geoipVersion.writeText(geoipVersionInternal)
-            }
 
-            val geosite = File(externalAssets, "geosite.dat")
-            val geositeVersion = File(externalAssets, "geosite.version.txt")
-            val geositeVersionInternal = assets.open("v2ray/geosite.version.txt")
-                .use { it.bufferedReader().readText() }
-            if (!geosite.isFile || DataStore.rulesProvider == 0 && geositeVersion.isFile && geositeVersionInternal.toLong() > geositeVersion.readText()
-                    .toLongOrNull() ?: -1L
-            ) {
-                XZInputStream(assets.open("v2ray/geosite.dat.xz")).use { input ->
-                    geosite.outputStream().use {
-                        input.copyTo(it)
+            runCatching {
+                val geoip = File(externalAssets, "geoip.dat")
+                val geoipVersion = File(externalAssets, "geoip.version.txt")
+                val geoipVersionInternal = assets.open("v2ray/geoip.version.txt")
+                    .use { it.bufferedReader().readText() }
+                if (!geoip.isFile || DataStore.rulesProvider == 0 && geoipVersion.isFile && geoipVersionInternal.toLong() > geoipVersion.readText()
+                        .toLongOrNull() ?: -1L
+                ) {
+                    XZInputStream(assets.open("v2ray/geoip.dat.xz")).use { input ->
+                        geoip.outputStream().use {
+                            input.copyTo(it)
+                        }
                     }
+                    geoipVersion.writeText(geoipVersionInternal)
                 }
-                geositeVersion.writeText(geositeVersionInternal)
+
+                val geosite = File(externalAssets, "geosite.dat")
+                val geositeVersion = File(externalAssets, "geosite.version.txt")
+                val geositeVersionInternal = assets.open("v2ray/geosite.version.txt")
+                    .use { it.bufferedReader().readText() }
+                if (!geosite.isFile || DataStore.rulesProvider == 0 && geositeVersion.isFile && geositeVersionInternal.toLong() > geositeVersion.readText()
+                        .toLongOrNull() ?: -1L
+                ) {
+                    XZInputStream(assets.open("v2ray/geosite.dat.xz")).use { input ->
+                        geosite.outputStream().use {
+                            input.copyTo(it)
+                        }
+                    }
+                    geositeVersion.writeText(geositeVersionInternal)
+                }
+
+                val browserForwarder = File(internalAssets, "index.js")
+                val coreVersion = File(internalAssets, "core.version.txt")
+                val coreVersionInternal = assets.open("v2ray/core.version.txt")
+                    .use { it.bufferedReader().readText() }
+                if (!coreVersion.isFile || coreVersionInternal != coreVersion.readText()) {
+                    XZInputStream(assets.open("v2ray/index.js.xz")).use { input ->
+                        browserForwarder.outputStream().use {
+                            input.copyTo(it)
+                        }
+                    }
+                    coreVersion.writeText(coreVersionInternal)
+                }
+            }.onFailure {
+                Logs.w(it)
             }
 
             checkMT()
+        }
+
+        runOnDefaultDispatcher {
             PackageCache.register()
         }
 
